@@ -188,3 +188,21 @@ test('level 5 is the nuke', async ($, on) => {
   expect((await ui.find({ key: 'sparks' }))?.props.rows).toBe(11)
   await ui.unmount()
 })
+
+test('levels 2 and 3 grow the band for the fireworks, then it shrinks back', async ($, on) => {
+  const clock = engine(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount(BAND)
+  await $.tool.call({ tool: 'mcp__power-mode__celebrate', level: 2 } as never)
+  await clock.advance(33)
+  expect((await ui.find({ key: 'sparks' }))?.props.rows).toBe(7)
+
+  await $.tool.call({ tool: 'mcp__power-mode__celebrate', level: 3, shout: 'BIG' } as never)
+  await clock.advance(33)
+  expect((await ui.find({ key: 'sparks' }))?.props.rows).toBe(11)
+
+  await clock.advance(6000)
+  expect(await ui.find({ key: 'sparks' })).toBeUndefined()
+  await ui.unmount()
+})

@@ -21,6 +21,7 @@ const BG = '#181818'
 const FG = '#d8d8d8'
 const DIM = '#6b6b6b'
 const FONT = 'DejaVu Sans Mono 13'
+const LINE_HEIGHT = 17 * 1024
 
 const bundle = join(WORK, 'register.mjs')
 execFileSync('npx', [
@@ -57,6 +58,7 @@ function session(options = {}) {
     },
     ui: { blit: async () => ({}), resolve: () => ({ Box: element('Box'), Raster: element('Raster') }) },
     command: { register: async () => ({}) },
+    tool: { register: async () => ({}) },
   }
   const fire = async (event, e) => {
     for (const hook of hooks[event] ?? []) await hook($, e, async x => x)
@@ -76,6 +78,9 @@ function session(options = {}) {
       const e = { origin: { kind: 'composer' }, text: draft, cursor: draft.length, start: draft.length, end: draft.length, inputText: text }
       draft += shown
       await fire('prompt.edit', e)
+    },
+    async celebrate(level, shout) {
+      await fire('tool.call', { tool: 'mcp__power-mode__celebrate', level, ...(shout ? { shout } : {}) })
     },
     tick() {
       for (const t of timers) if (t.live) t.fn()
@@ -122,7 +127,9 @@ function markup(raster, draft, bandRows) {
   lines.push(`<span foreground="${DIM}">&gt;</span> ${esc(shown)}<span background="${FG}"> </span>`.padEnd(COLUMNS))
   lines.push(rule)
 
-  return `<span font="${FONT}" foreground="${FG}">${lines.join('\n')}</span>`
+  // A fixed line height (Pango units, 1/1024 pt): a fallback glyph would
+  // otherwise make its line taller and the frames differ in size.
+  return `<span font="${FONT}" foreground="${FG}" line_height="${LINE_HEIGHT}">${lines.join('\n')}</span>`
 }
 
 let frameNo = 0
@@ -130,7 +137,12 @@ async function capture(dir, s, bandRows) {
   const file = join(dir, `f${String(frameNo++).padStart(4, '0')}`)
   // Inline, not pango:@file: ImageMagick's default policy refuses @ paths.
   const text = markup(await s.band(), s.draft, bandRows)
-  execFileSync('convert', ['-background', BG, '-bordercolor', BG, '-border', '18x14', `pango:${text}`, file + '.png'])
+  // Every frame of a scene on one fixed canvas: ffmpeg stops at a size change.
+  const height = (bandRows + 3) * 17 + 6
+  execFileSync('convert', [
+    '-background', BG, `pango:${text}`, '-gravity', 'northwest', '-extent', `${COLUMNS * 10 + 4}x${height}`,
+    '-bordercolor', BG, '-border', '18x14', file + '.png',
+  ])
 }
 
 // Runs a scene and writes docs/demo/<name>.gif plus the still at `still`.
@@ -225,4 +237,24 @@ await scene('nuke', 11, async snap => {
   await tail(s, snap, 100)
 }, 78)
 
-rmSync(WORK, { recursive: true, force: true })
+// Claude's celebrations, one per level, after a reply that earned it.
+const CELEBRATIONS = [
+  [1, '', 'fixed the off-by-one in the pager', 4, 4],
+  [2, '', 'tests pass locally and in CI', 24, 7],
+  [3, 'ALL GREEN!', 'the flaky suite is green 50 runs in a row', 30, 11],
+  [4, 'V1.0 IS LIVE!', 'released 1.0 to npm and tagged it', 44, 11],
+  [5, 'SHIPPED!', 'the migration is done: 0 errors', 48, 11],
+]
+for (const [level, shout, draft, still, bandRows] of CELEBRATIONS) {
+  await scene(`celebrate-${level}`, bandRows, async snap => {
+    const s = session()
+    await s.start()
+    s.draft = draft
+    await snap(s)
+    await s.celebrate(level, shout)
+    await tail(s, snap, level === 4 ? 110 : level === 5 ? 100 : 60)
+  }, still)
+}
+
+if (!process.env.KEEP) rmSync(WORK, { recursive: true, force: true })
+else console.log('frames kept in', WORK)

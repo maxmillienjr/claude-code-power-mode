@@ -3,7 +3,8 @@ import type { Register } from 'claude-code'
 
 const isActive = atom({ plugin: 'power-mode', key: 'isActive' } as const, false)
 const isEnabled = atom({ plugin: 'power-mode', key: 'isEnabled' } as const, true)
-const isNuking = atom({ plugin: 'power-mode', key: 'isNuking' } as const, false)
+// The band grows for a nuke and for the bigger celebrations.
+const isTall = atom({ plugin: 'power-mode', key: 'isTall' } as const, false)
 
 const TICK_MS = 33
 // Columns the prompt draws before the draft ("> "), so sparks leave the caret.
@@ -20,6 +21,7 @@ const NUKE_MS = 2800
 const NUKE_ROWS = 10 // the band grows to this many spark rows for a nuke, room allowing
 const CELEBRATE = 'celebrate'
 const VOLLEY_MS = 350 // between rocket volleys at level 4
+const STAR_MS = 220 // how long a firework fragment shows as a star
 const LEVEL_SHOUTS = ['', 'Nice!', 'Boom!', 'Huge!', 'LEGENDARY!', 'KABOOM!']
 // What a long paste becomes in the prompt box: the mod may see this, not the text.
 const PASTE_PLACEHOLDER = /\[Pasted text #(\d+)/g
@@ -57,9 +59,11 @@ const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
 
 // `h` is height above the bottom of the spark rows, in braille dots, so a
 // particle stays put when the band grows for a nuke.
-type Particle = { x: number; h: number; vx: number; vh: number; age: number; life: number; color: number; fuse: number }
+// A `star` is a fresh firework fragment, drawn as a full `*` before it fades to a dot.
+type Particle = { x: number; h: number; vx: number; vh: number; age: number; life: number; color: number; fuse: number; star?: boolean }
 type Geometry = { requestId: string; columns: number; rows: number }
-type Exclamation = { text: string; age: number; color: number }
+// `ms` is how long it shows; a big celebration holds its shout for the whole show.
+type Exclamation = { text: string; age: number; color: number; ms: number }
 type Nuke = { age: number; column: number }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.floor(n)))
@@ -121,6 +125,20 @@ export const register: Register = (on, options) => {
   let shakeUntil = 0
   // Rocket volleys still to launch for a level-4 celebration, by frame time.
   let volleys: number[] = []
+  // While `tall`, the band is `tallRows` spark rows (room allowing) until `tallUntil`.
+  let tall = false
+  let tallRows = NUKE_ROWS
+  let tallUntil = 0
+  let maxRowsSeen = 24
+
+  function grow(rows: number, ms: number) {
+    tall = true
+    tallRows = Math.max(rows, nuke !== undefined ? NUKE_ROWS : 0)
+    tallUntil = Math.max(tallUntil, t + ms)
+  }
+
+  // Spark rows the band has, or is about to have: what rockets aim for.
+  const bandRows = () => (tall ? clamp(Math.min(tallRows, maxRowsSeen - 2), sparkRows, NUKE_ROWS) : sparkRows)
   const seenPastes = new Set<string>()
 
   // Placeholder ids in `text` not seen before: each one is a long paste.
@@ -139,14 +157,14 @@ export const register: Register = (on, options) => {
 
   // One animation frame from a timer: what the hook that owns the timer must do.
   function tick(): { saveBest: boolean; shrink: boolean; stop: boolean; cells?: string } {
-    const { expired, nukeEnded, idle } = step()
+    const { expired, shrink, idle } = step()
 
-    return { saveBest: expired, shrink: nukeEnded, stop: idle, cells: !idle && geometry !== undefined ? frame() : undefined }
+    return { saveBest: expired, shrink, stop: idle, cells: !idle && geometry !== undefined ? frame() : undefined }
   }
 
   const colorsNow = () => (tierOf(combo) === TIERS.length - 1 ? RAINBOW : palette)
 
-  function burst(column: number, count: number, spread: number, speed: number, fireworks = false) {
+  function burst(column: number, count: number, spread: number, speed: number, fireworks = false, star = false) {
     for (let i = 0; i < count; i++) {
       particles.push({
         x: column * 2 + 1 + (Math.random() - 0.5) * spread,
@@ -157,6 +175,7 @@ export const register: Register = (on, options) => {
         life: 450 + Math.random() * 500,
         color: pick(colorsNow()),
         fuse: fireworks && Math.random() < 0.15 ? 250 + Math.random() * 200 : 0,
+        star,
       })
     }
     if (particles.length > 600) particles = particles.slice(-600)
@@ -254,7 +273,15 @@ export const register: Register = (on, options) => {
       if (dx < 0 || dy < 0 || dx >= columns * 2 || dy >= height) continue
       const i = Math.floor(dy / 4) * columns + Math.floor(dx / 2)
       const held = glyph[i] ?? SPACE
-      // Sparks draw over empty cells and other sparks, never over cloud or flame.
+      if (p.star && p.age < STAR_MS) {
+        if (held === SPACE || (held >= 0x2800 && held <= 0x28ff)) {
+          glyph[i] = 0x2a // *
+          fg[i] = p.color
+          freshest[i] = -1
+        }
+        continue
+      }
+      // Sparks draw over empty cells and other sparks, never over cloud, flame or a star.
       if (held !== SPACE && (held < 0x2800 || held > 0x28ff)) continue
       glyph[i] = (held === SPACE ? 0x2800 : held) | (DOT[(dy % 4) * 2 + (dx % 2)] ?? 0)
       if (p.age < (freshest[i] ?? Infinity)) {
@@ -265,7 +292,7 @@ export const register: Register = (on, options) => {
 
     // The exclamation floats up the right side of the spark rows.
     if (exclamation !== undefined) {
-      const k = exclamation.age / EXCLAIM_MS
+      const k = exclamation.age / exclamation.ms
       const row = clamp((spark - 1) * (1 - k), 0, spark - 1)
       const jitter = exclamation.age < 300 ? Math.round((Math.random() - 0.5) * 2) : 0
       const start = clamp(columns - exclamation.text.length - 2 + jitter, 0, columns)
@@ -309,9 +336,9 @@ export const register: Register = (on, options) => {
     return toBase64(new Uint8Array(words.buffer))
   }
 
-  // Advances one frame. `expired` says the combo just ran out, `nukeEnded`
-  // that the band can shrink back, `idle` that the timer should stop.
-  function step(): { expired: boolean; nukeEnded: boolean; idle: boolean } {
+  // Advances one frame. `expired` says the combo just ran out, `shrink` that
+  // the band can go back to its size, `idle` that the timer should stop.
+  function step(): { expired: boolean; shrink: boolean; idle: boolean } {
     t += TICK_MS
     const dt = TICK_MS / 1000
     const born: Particle[] = []
@@ -327,7 +354,7 @@ export const register: Register = (on, options) => {
         for (let i = 0; i < 10; i++) {
           const a = (i / 10) * Math.PI * 2
           const v = 18 + Math.random() * 8
-          born.push({ x: p.x, h: p.h, vx: Math.cos(a) * v * 2, vh: Math.sin(a) * v, age: 0, life: 420, color: pick(colorsNow()), fuse: 0 })
+          born.push({ x: p.x, h: p.h, vx: Math.cos(a) * v * 2, vh: Math.sin(a) * v, age: 0, life: 520, color: p.color, fuse: 0, star: true })
         }
       }
     }
@@ -335,16 +362,18 @@ export const register: Register = (on, options) => {
 
     if (exclamation !== undefined) {
       exclamation.age += TICK_MS
-      if (exclamation.age > EXCLAIM_MS) exclamation = undefined
+      if (exclamation.age > exclamation.ms) exclamation = undefined
     }
 
-    let nukeEnded = false
     if (nuke !== undefined) {
       nuke.age += TICK_MS
-      if (nuke.age > NUKE_MS) {
-        nuke = undefined
-        nukeEnded = true
-      }
+      if (nuke.age > NUKE_MS) nuke = undefined
+    }
+
+    let shrink = false
+    if (tall && nuke === undefined && volleys.length === 0 && t >= tallUntil) {
+      tall = false
+      shrink = true
     }
 
     while (volleys.length > 0 && (volleys[0] ?? Infinity) <= t) {
@@ -357,7 +386,7 @@ export const register: Register = (on, options) => {
 
     return {
       expired,
-      nukeEnded,
+      shrink,
       idle: combo === 0 && particles.length === 0 && exclamation === undefined && nuke === undefined && volleys.length === 0,
     }
   }
@@ -367,55 +396,61 @@ export const register: Register = (on, options) => {
     combo = 0
   }
 
-  function exclaim(text: string, colors: readonly number[] = colorsNow()) {
-    exclamation = { text, age: 0, color: pick(colors) }
+  function exclaim(text: string, colors: readonly number[] = colorsNow(), ms = EXCLAIM_MS) {
+    exclamation = { text, age: 0, color: pick(colors), ms }
   }
 
-  // Rockets from random columns that climb high and burst into rings.
+  // Rockets from random columns that climb to between half and nine tenths of
+  // the band and burst into rings at the top of their arc, so they burst in
+  // view however tall the band is.
   function launchRockets(count: number, rainbow: boolean) {
     const width = geometry?.columns ?? 80
+    const height = bandRows() * 4
     for (let i = 0; i < count; i++) {
+      const vh = Math.sqrt(2 * GRAVITY * height * (0.5 + Math.random() * 0.4))
       particles.push({
         x: (4 + Math.random() * (width - 8)) * 2,
         h: 0.5,
         vx: (Math.random() - 0.5) * 10,
-        vh: 42 + Math.random() * 14,
+        vh,
         age: 0,
-        life: 2000,
+        life: 4000,
         color: pick(rainbow ? RAINBOW : palette),
-        fuse: 380 + Math.random() * 220,
+        fuse: (vh / GRAVITY) * 1000,
       })
     }
   }
 
   // Claude's own celebration: 1 a few sparks, 2 fireworks, 3 a finale with a
-  // shout, 4 volleys of rainbow fireworks, 5 the nuke. Returns whether it nuked.
+  // shout, 4 volleys of rainbow fireworks, 5 the nuke. Returns whether the band grows.
   function celebrate(level: number, shout: string): boolean {
     const width = geometry?.columns ?? 80
     const words = shout.trim().slice(0, 28) || (LEVEL_SHOUTS[level] ?? '')
 
     if (level >= 5) {
       nuke = { age: 0, column: Math.floor(width / 2) }
+      grow(NUKE_ROWS, NUKE_MS)
       burst(nuke.column, 120, 30, 1.8, true)
       exclaim(words, RAINBOW)
       return true
     }
     if (level === 1) {
-      for (let i = 0; i < 3; i++) burst(4 + Math.floor(Math.random() * (width - 8)), 6, 2, 1)
+      for (let i = 0; i < 3; i++) burst(4 + Math.floor(Math.random() * (width - 8)), 6, 2, 1, false, true)
     }
+    if (level >= 2) grow(level === 2 ? 6 : NUKE_ROWS, level === 4 ? 5 * VOLLEY_MS + 2200 : 2400)
     if (level === 2) launchRockets(4, false)
     if (level === 3) {
       launchRockets(8, true)
-      exclaim(words, RAINBOW)
+      exclaim(words, RAINBOW, 2400)
     }
     if (level === 4) {
       launchRockets(6, true)
       volleys = [1, 2, 3, 4, 5].map(n => t + n * VOLLEY_MS)
-      exclaim(words, RAINBOW)
+      exclaim(words, RAINBOW, 5 * VOLLEY_MS + 1800)
     }
     if (level === 2 && shout.trim()) exclaim(words)
 
-    return false
+    return level >= 2
   }
 
   // A hit of `chars` characters at `column`. Returns whether it set off a nuke.
@@ -430,6 +465,7 @@ export const register: Register = (on, options) => {
 
     if (isPaste && chars >= NUKE_PASTE) {
       nuke = { age: 0, column: clamp(column, 8, Math.max(8, width - 9)) }
+      grow(NUKE_ROWS, NUKE_MS)
       burst(nuke.column, 120, 30, 1.8, true)
       exclaim(pick(NUKE_WORDS))
       return true
@@ -488,9 +524,11 @@ export const register: Register = (on, options) => {
       particles = []
       exclamation = undefined
       nuke = undefined
+      volleys = []
+      tall = false
       endCombo()
       await $.store.set('best', best)
-      await update($, isNuking, () => false)
+      await update($, isTall, () => false)
       await update($, isActive, () => false)
     }
 
@@ -513,7 +551,7 @@ export const register: Register = (on, options) => {
         timer = $.clock.every(TICK_MS, () => {
           const r = tick()
           if (r.saveBest) void $.store.set('best', best)
-          if (r.shrink) void update($, isNuking, () => false)
+          if (r.shrink) void update($, isTall, () => false)
           if (r.stop) {
             timer?.cancel()
             timer = undefined
@@ -523,7 +561,7 @@ export const register: Register = (on, options) => {
           }
         })
       }
-      if (isNuke) await update($, isNuking, () => true)
+      if (isNuke) await update($, isTall, () => true)
       await update($, isActive, () => true)
     }
 
@@ -540,7 +578,7 @@ export const register: Register = (on, options) => {
         timer = $.clock.every(TICK_MS, () => {
           const r = tick()
           if (r.saveBest) void $.store.set('best', best)
-          if (r.shrink) void update($, isNuking, () => false)
+          if (r.shrink) void update($, isTall, () => false)
           if (r.stop) {
             timer?.cancel()
             timer = undefined
@@ -550,7 +588,7 @@ export const register: Register = (on, options) => {
           }
         })
       }
-      await update($, isNuking, () => true)
+      await update($, isTall, () => true)
       await update($, isActive, () => true)
     }
 
@@ -567,12 +605,12 @@ export const register: Register = (on, options) => {
 
     if (!(await read($, isEnabled))) return { result: 'Power Mode is off; nothing was drawn.' }
 
-    const isNuke = celebrate(level, shout)
+    const isTallNow = celebrate(level, shout)
     if (timer === undefined) {
       timer = $.clock.every(TICK_MS, () => {
         const r = tick()
         if (r.saveBest) void $.store.set('best', best)
-        if (r.shrink) void update($, isNuking, () => false)
+        if (r.shrink) void update($, isTall, () => false)
         if (r.stop) {
           timer?.cancel()
           timer = undefined
@@ -582,7 +620,7 @@ export const register: Register = (on, options) => {
         }
       })
     }
-    if (isNuke) await update($, isNuking, () => true)
+    if (isTallNow) await update($, isTall, () => true)
     await update($, isActive, () => true)
 
     return { result: `Celebrated at level ${level}.` }
@@ -604,8 +642,8 @@ export const register: Register = (on, options) => {
       !e.props.hasSurvey &&
       (await read($, isEnabled)) &&
       (await read($, isActive))
-    const nukeRows = clamp(e.props.maxRows - 2, sparkRows, NUKE_ROWS)
-    let rows = ((await read($, isNuking)) ? nukeRows : sparkRows) + 1
+    maxRowsSeen = e.props.maxRows
+    let rows = ((await read($, isTall)) ? bandRows() : sparkRows) + 1
     if (rows + 1 > e.props.maxRows) rows = sparkRows + 1
 
     if (!isShown || e.surface !== 'terminal' || rows + 1 > e.props.maxRows) {
