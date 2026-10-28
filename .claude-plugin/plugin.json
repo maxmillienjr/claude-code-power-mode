@@ -1,0 +1,46 @@
+{
+  "name": "power-mode",
+  "version": "0.1.0",
+  "description": "Power Mode for the Claude Code prompt: sparks fly off the caret as you type, a combo counter builds, exclamations at milestones.",
+  "author": {
+    "name": "Max Millien",
+    "url": "https://github.com/maxmillienjr"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/maxmillienjr/claude-code-power-mode",
+  "homepage": "https://github.com/maxmillienjr/claude-code-power-mode",
+  "keywords": [
+    "power-mode",
+    "fun",
+    "animation",
+    "typing",
+    "combo"
+  ],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "sparkRows": {
+      "type": "number",
+      "title": "Spark rows",
+      "description": "How many rows above the prompt the sparks fly in (1 to 8).",
+      "default": 3
+    },
+    "comboTimeout": {
+      "type": "number",
+      "title": "Combo timeout",
+      "description": "Seconds without a keystroke before the combo resets.",
+      "default": 8
+    },
+    "palette": {
+      "type": "string",
+      "title": "Palette",
+      "description": "Spark colors.",
+      "options": [
+        "fire",
+        "rainbow",
+        "ice",
+        "matrix"
+      ],
+      "default": "fire"
+    }
+  }
+}

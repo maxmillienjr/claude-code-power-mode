@@ -1,0 +1,13 @@
+{
+  "name": "claude-code-power-mode",
+  "description": "Power Mode for the Claude Code prompt: sparks, combos and a paste nuke.",
+  "owner": {
+    "name": "Max Millien"
+  },
+  "plugins": [
+    {
+      "name": "power-mode",
+      "source": "./"
+    }
+  ]
+}
