@@ -62,6 +62,21 @@ adds its length to the combo.
 
 Submitting a prompt mid-combo fires one last burst across the width.
 
+**Claude celebrates too.** The mod gives Claude a `celebrate` tool, and Claude calls it
+when something earns it: tests green after a fight, a hard bug found, a deploy landing.
+It picks the level by how big the moment is:
+
+| Level | For | What you see |
+|---|---|---|
+| 1 | a small win | a few sparks |
+| 2 | a solid one | fireworks |
+| 3 | a big one | a fireworks finale with Claude's shout ("ALL GREEN!") |
+| 4 | a milestone | volleys of rainbow fireworks |
+| 5 | once a project | the mushroom cloud |
+
+The tool only draws, so it never asks for permission, and its description tells Claude
+to keep it rare. `/power-mode` off silences it too.
+
 ## Settings
 
 `/power-mode` turns it off and on, and reports your best combo. The rest is in

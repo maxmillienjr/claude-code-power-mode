@@ -22,6 +22,7 @@ function engine(on: On) {
   const clock = mock.clock(on)
   mock.store(on)
   on('command.register', () => ({ value: { command: 'power-mode' } }))
+  on('tool.register', () => ({ value: {} }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('prompt.edit', (_, e) => ({
     text: e.text.slice(0, e.start) + e.inputText + e.text.slice(e.end),
@@ -158,6 +159,31 @@ test('a collapsed paste placeholder is a nuke too', async ($, on) => {
     end: 0,
     inputText: '[Pasted text #1 +19 lines]',
   } as never)
+  await clock.advance(33)
+  expect((await ui.find({ key: 'sparks' }))?.props.rows).toBe(11)
+  await ui.unmount()
+})
+
+test('Claude celebrates a big win with its shout in the sky', async ($, on) => {
+  const clock = engine(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount(BAND)
+  const ran = await $.tool.call({ tool: 'mcp__power-mode__celebrate', level: 3, shout: 'ALL GREEN!' } as never)
+  expect(JSON.stringify(ran)).toContain('level 3')
+  await clock.advance(33)
+
+  const raster = await ui.find({ key: 'sparks' })
+  expect(spell(raster!.props)).toContain('ALL GREEN!')
+  await ui.unmount()
+})
+
+test('level 5 is the nuke', async ($, on) => {
+  const clock = engine(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount(BAND)
+  await $.tool.call({ tool: 'mcp__power-mode__celebrate', level: 5 } as never)
   await clock.advance(33)
   expect((await ui.find({ key: 'sparks' }))?.props.rows).toBe(11)
   await ui.unmount()

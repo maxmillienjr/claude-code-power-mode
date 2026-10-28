@@ -18,6 +18,9 @@ const GRAVITY = 70 // braille dots per second squared
 const NUKE_PASTE = 100 // a paste this many characters long is a nuke
 const NUKE_MS = 2800
 const NUKE_ROWS = 10 // the band grows to this many spark rows for a nuke, room allowing
+const CELEBRATE = 'celebrate'
+const VOLLEY_MS = 350 // between rocket volleys at level 4
+const LEVEL_SHOUTS = ['', 'Nice!', 'Boom!', 'Huge!', 'LEGENDARY!', 'KABOOM!']
 // What a long paste becomes in the prompt box: the mod may see this, not the text.
 const PASTE_PLACEHOLDER = /\[Pasted text #(\d+)/g
 
@@ -116,6 +119,8 @@ export const register: Register = (on, options) => {
   let t = 0
   let lastHitAt = 0
   let shakeUntil = 0
+  // Rocket volleys still to launch for a level-4 celebration, by frame time.
+  let volleys: number[] = []
   const seenPastes = new Set<string>()
 
   // Placeholder ids in `text` not seen before: each one is a long paste.
@@ -342,13 +347,18 @@ export const register: Register = (on, options) => {
       }
     }
 
+    while (volleys.length > 0 && (volleys[0] ?? Infinity) <= t) {
+      volleys.shift()
+      launchRockets(4, true)
+    }
+
     const expired = combo > 0 && t - lastHitAt > timeoutMs
     if (expired) endCombo()
 
     return {
       expired,
       nukeEnded,
-      idle: combo === 0 && particles.length === 0 && exclamation === undefined && nuke === undefined,
+      idle: combo === 0 && particles.length === 0 && exclamation === undefined && nuke === undefined && volleys.length === 0,
     }
   }
 
@@ -357,8 +367,55 @@ export const register: Register = (on, options) => {
     combo = 0
   }
 
-  function exclaim(text: string) {
-    exclamation = { text, age: 0, color: pick(colorsNow()) }
+  function exclaim(text: string, colors: readonly number[] = colorsNow()) {
+    exclamation = { text, age: 0, color: pick(colors) }
+  }
+
+  // Rockets from random columns that climb high and burst into rings.
+  function launchRockets(count: number, rainbow: boolean) {
+    const width = geometry?.columns ?? 80
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: (4 + Math.random() * (width - 8)) * 2,
+        h: 0.5,
+        vx: (Math.random() - 0.5) * 10,
+        vh: 42 + Math.random() * 14,
+        age: 0,
+        life: 2000,
+        color: pick(rainbow ? RAINBOW : palette),
+        fuse: 380 + Math.random() * 220,
+      })
+    }
+  }
+
+  // Claude's own celebration: 1 a few sparks, 2 fireworks, 3 a finale with a
+  // shout, 4 volleys of rainbow fireworks, 5 the nuke. Returns whether it nuked.
+  function celebrate(level: number, shout: string): boolean {
+    const width = geometry?.columns ?? 80
+    const words = shout.trim().slice(0, 28) || (LEVEL_SHOUTS[level] ?? '')
+
+    if (level >= 5) {
+      nuke = { age: 0, column: Math.floor(width / 2) }
+      burst(nuke.column, 120, 30, 1.8, true)
+      exclaim(words, RAINBOW)
+      return true
+    }
+    if (level === 1) {
+      for (let i = 0; i < 3; i++) burst(4 + Math.floor(Math.random() * (width - 8)), 6, 2, 1)
+    }
+    if (level === 2) launchRockets(4, false)
+    if (level === 3) {
+      launchRockets(8, true)
+      exclaim(words, RAINBOW)
+    }
+    if (level === 4) {
+      launchRockets(6, true)
+      volleys = [1, 2, 3, 4, 5].map(n => t + n * VOLLEY_MS)
+      exclaim(words, RAINBOW)
+    }
+    if (level === 2 && shout.trim()) exclaim(words)
+
+    return false
   }
 
   // A hit of `chars` characters at `column`. Returns whether it set off a nuke.
@@ -393,6 +450,25 @@ export const register: Register = (on, options) => {
   }
 
   on('session.start', async ($, e, next) => {
+    await $.tool.register({
+      name: CELEBRATE,
+      description:
+        'Throws a celebration animation above the prompt (Power Mode). Call it only for a real win the ' +
+        'person would cheer: tests green after a fight, a hard bug found, a deploy or release landing, a ' +
+        'big refactor done. Never for routine answers, and at most once a turn. Pick the level by how big ' +
+        'the moment is: 1 a small win (a few sparks), 2 a solid one (fireworks), 3 a big one (a fireworks ' +
+        'finale with your shout), 4 a milestone (volleys of rainbow fireworks), 5 rare, a once-a-project ' +
+        'moment (a mushroom cloud). Most wins are 1 or 2.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          level: { type: 'integer', minimum: 1, maximum: 5, description: 'How big the moment is, 1 to 5.' },
+          shout: { type: 'string', maxLength: 28, description: 'A few words shown in the sky, e.g. "ALL GREEN!". Optional.' },
+        },
+        required: ['level'],
+      },
+      isDeferred: false,
+    })
     best = Number((await $.store.get('best')) ?? 0)
     const stored = await $.store.get('isEnabled')
     if (stored === false) await update($, isEnabled, () => false)
@@ -479,6 +555,37 @@ export const register: Register = (on, options) => {
     }
 
     return next(e)
+  })
+
+  // The tool only draws, so it never needs the person's permission.
+  on('tool.check', { tool: 'mcp__power-mode__celebrate' }, () => ({ decision: 'allow', reason: 'Power Mode only draws.' }))
+
+  on('tool.call', { tool: 'mcp__power-mode__celebrate' }, async ($, e) => {
+    const input = e as unknown as { level?: unknown; shout?: unknown }
+    const level = clamp(Number(input.level ?? 1), 1, 5)
+    const shout = typeof input.shout === 'string' ? input.shout : ''
+
+    if (!(await read($, isEnabled))) return { result: 'Power Mode is off; nothing was drawn.' }
+
+    const isNuke = celebrate(level, shout)
+    if (timer === undefined) {
+      timer = $.clock.every(TICK_MS, () => {
+        const r = tick()
+        if (r.saveBest) void $.store.set('best', best)
+        if (r.shrink) void update($, isNuking, () => false)
+        if (r.stop) {
+          timer?.cancel()
+          timer = undefined
+          void update($, isActive, () => false)
+        } else if (r.cells !== undefined && geometry !== undefined) {
+          $.ui.blit({ requestId: geometry.requestId, key: 'sparks', cells: r.cells }).catch(() => {})
+        }
+      })
+    }
+    if (isNuke) await update($, isNuking, () => true)
+    await update($, isActive, () => true)
+
+    return { result: `Celebrated at level ${level}.` }
   })
 
   on('prompt.submit', async ($, e, next) => {
