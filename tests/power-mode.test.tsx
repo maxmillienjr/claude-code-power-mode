@@ -108,7 +108,7 @@ function spell(props: Record<string, unknown>): string {
   return out
 }
 
-test('the counter names the tier once the combo climbs', async ($, on) => {
+test('the bottom row names the tier, not the count', async ($, on) => {
   const clock = engine(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
 
@@ -117,7 +117,9 @@ test('the counter names the tier once the combo climbs', async ($, on) => {
   await clock.advance(33)
 
   const raster = await ui.find({ key: 'sparks' })
-  expect(spell(raster!.props)).toContain('26 COMBO · HEATING UP')
+  const drawn = spell(raster!.props)
+  expect(drawn).toContain('HEATING UP')
+  expect(drawn).not.toContain('26')
   await ui.unmount()
 })
 

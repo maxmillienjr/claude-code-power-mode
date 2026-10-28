@@ -271,10 +271,10 @@ export const register: Register = (on, options) => {
       }
     }
 
-    // The last row: the counter and tier (shaken on a hit), then the timer bar.
+    // The last row: the tier's name (shaken on a hit), then the timer bar.
     if (combo > 0) {
       const base = spark * columns
-      const label = ` ${combo} COMBO ${tier.name ? `· ${tier.name} ` : ''}`
+      const label = tier.name ? ` ${tier.name} ` : ''
       const shake = t < shakeUntil ? Math.round(Math.random() * 2) : 0
       const colors = colorsNow()
       const level =
