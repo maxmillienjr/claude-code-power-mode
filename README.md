@@ -35,8 +35,6 @@ Every keystroke throws a handful of sparks up from the caret into a few rows abo
 prompt. They are braille dots, so they move at half-cell steps and fall back under
 gravity. Under them, a bar drains toward the combo timeout and jolts on each hit.
 
-![Typing a prompt: sparks rise off the caret and HEATING UP! flashes at 25](docs/demo/typing.gif)
-
 The combo climbs through tiers, and each tier changes how the sparks behave:
 
 | Combo | Tier | What changes |
@@ -46,9 +44,6 @@ The combo climbs through tiers, and each tier changes how the sparks behave:
 | 50 | ON FIRE | a row of flames that dies down as the timer runs out |
 | 100 | UNSTOPPABLE | some sparks burst into fireworks at the top of their arc |
 | 250 | GODLIKE | rainbow sparks, and the bar cycles colors |
-
-![ON FIRE: flames along the bottom row](docs/demo/on-fire.gif)
-![UNSTOPPABLE: sparks burst into fireworks](docs/demo/unstoppable.gif)
 
 Crossing a tier shouts its name on the right and sends a burst across the full width. Every 25 hits
 in between earns an exclamation ("Radical!", "Stupendous!").

@@ -198,29 +198,6 @@ const tail = async (s, snap, frames) => {
 
 mkdirSync(OUT, { recursive: true })
 
-await scene('typing', 4, async snap => {
-  const s = session()
-  await s.start()
-  await typeOut(s, snap, 'refactor the parser so it streams tokens instead of ')
-  await tail(s, snap, 30)
-}, 75)
-
-await scene('on-fire', 4, async snap => {
-  const s = session()
-  await s.start()
-  await warm(s, 44)
-  await typeOut(s, snap, 'add retries with exponential backoff')
-  await tail(s, snap, 20)
-}, 40)
-
-await scene('unstoppable', 4, async snap => {
-  const s = session()
-  await s.start()
-  await warm(s, 92)
-  await typeOut(s, snap, 'write the migration and the rollback')
-  await tail(s, snap, 20)
-}, 30)
-
 await scene('godlike', 4, async snap => {
   const s = session()
   await s.start()
