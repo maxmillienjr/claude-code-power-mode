@@ -368,22 +368,17 @@ export const register: Register = (on, options) => {
       }
     }
 
-    // The last row: the tier's name (shaken on a hit), then the timer bar.
+    // The last row: the timer bar, jolted on a hit. The tier's name is shouted
+    // on the right as it is reached, so this row carries no words.
     if (combo > 0) {
       const base = spark * columns
-      const label = tier.name ? ` ${tier.name} ` : ''
       const shake = t < shakeUntil ? Math.round(Math.random() * 2) : 0
       const colors = colorsNow()
       const level =
         colors === RAINBOW
           ? (RAINBOW[Math.floor(t / 100) % RAINBOW.length] ?? 0xffffff)
           : (colors[Math.min(tierOf(combo), colors.length - 1)] ?? 0xffffff)
-      const at = clamp(1 + shake, 0, columns)
-      for (let c = 0; c < label.length && at + c < columns; c++) {
-        glyph[base + at + c] = label.charCodeAt(c)
-        fg[base + at + c] = level
-      }
-      const barStart = at + label.length + 1
+      const barStart = clamp(1 + shake, 0, columns)
       const barLength = Math.round(Math.max(0, columns - barStart - 1) * left)
       for (let c = 0; c < barLength; c++) {
         glyph[base + barStart + c] = BAR

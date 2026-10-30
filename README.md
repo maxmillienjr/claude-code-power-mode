@@ -32,10 +32,9 @@ terminal only; elsewhere the mod stays out of the way.
 
 Every keystroke throws a handful of sparks up from the caret into a few rows above the
 prompt. They are braille dots, so they move at half-cell steps and fall back under
-gravity. Under them, a bar drains toward the combo timeout; once you reach a tier,
-its name sits beside the bar and shakes on each hit.
+gravity. Under them, a bar drains toward the combo timeout and jolts on each hit.
 
-![Typing a prompt: sparks rise off the caret and HEATING UP appears at 25](docs/demo/typing.gif)
+![Typing a prompt: sparks rise off the caret and HEATING UP! flashes at 25](docs/demo/typing.gif)
 
 The combo climbs through tiers, and each tier changes how the sparks behave:
 
@@ -45,13 +44,13 @@ The combo climbs through tiers, and each tier changes how the sparks behave:
 | 25 | HEATING UP | more sparks, faster |
 | 50 | ON FIRE | a row of flames that dies down as the timer runs out |
 | 100 | UNSTOPPABLE | some sparks burst into fireworks at the top of their arc |
-| 250 | GODLIKE | rainbow sparks, and the tier name cycles colors |
+| 250 | GODLIKE | rainbow sparks, and the bar cycles colors |
 
 ![ON FIRE: flames along the bottom row](docs/demo/on-fire.gif)
 ![UNSTOPPABLE: sparks burst into fireworks](docs/demo/unstoppable.gif)
 ![GODLIKE: rainbow sparks](docs/demo/godlike.gif)
 
-Crossing a tier shouts its name and sends a burst across the full width. Every 25 hits
+Crossing a tier shouts its name on the right and sends a burst across the full width. Every 25 hits
 in between earns an exclamation ("Radical!", "Stupendous!").
 
 **Pastes.** A paste of 100 characters or more is a blast: a white flash where you

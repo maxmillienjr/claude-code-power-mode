@@ -109,7 +109,7 @@ function spell(props: Record<string, unknown>): string {
   return out
 }
 
-test('the bottom row names the tier, not the count', async ($, on) => {
+test('reaching a tier shouts its name on the right; the bottom row is only the bar', async ($, on) => {
   const clock = engine(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
 
@@ -117,10 +117,11 @@ test('the bottom row names the tier, not the count', async ($, on) => {
   await type($, 'x'.repeat(26))
   await clock.advance(33)
 
-  const raster = await ui.find({ key: 'sparks' })
-  const drawn = spell(raster!.props)
-  expect(drawn).toContain('HEATING UP')
-  expect(drawn).not.toContain('26')
+  const lines = spell((await ui.find({ key: 'sparks' }))!.props).split('\n')
+  expect(lines.join('\n')).toContain('HEATING UP!')
+  expect(lines[3]).not.toContain('HEATING UP')
+  expect(lines[3]).not.toContain('26')
+  expect(lines[3]).toContain('\u2501')
   await ui.unmount()
 })
 
