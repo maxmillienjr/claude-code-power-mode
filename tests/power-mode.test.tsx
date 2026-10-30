@@ -124,43 +124,48 @@ test('the bottom row names the tier, not the count', async ($, on) => {
   await ui.unmount()
 })
 
-test('a long paste is a nuke: the band grows, then shrinks back', async ($, on) => {
+// A paste of `text` at the start of an empty prompt.
+async function paste($: Parameters<Parameters<typeof test>[1]>[0], text: string) {
+  await $.prompt.edit({ origin: { kind: 'composer' }, text: '', cursor: 0, start: 0, end: 0, inputText: text } as never)
+}
+
+test('a paste is a blast in the usual band, not a nuke', async ($, on) => {
   const clock = engine(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
 
   const ui = await $.ui.mount(BAND)
-  await $.prompt.edit({
-    origin: { kind: 'composer' },
-    text: '',
-    cursor: 0,
-    start: 0,
-    end: 0,
-    inputText: 'y'.repeat(300),
-  } as never)
-  await clock.advance(33)
-  expect((await ui.find({ key: 'sparks' }))?.props.rows).toBe(11)
+  await paste($, 'y'.repeat(300))
+  await clock.advance(132)
+  const raster = await ui.find({ key: 'sparks' })
+  expect(raster?.props.rows).toBe(4)
+  // The fireball is shaded blocks on the ground row, under the tier row.
+  expect(spell(raster!.props).split('\n')[2]).toMatch(/[\u2591-\u2593\u2588]/)
+  await ui.unmount()
+})
 
-  await clock.advance(3000)
+test('a paste of 1,000 characters is a big blast: the band grows, then shrinks back', async ($, on) => {
+  const clock = engine(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+
+  const ui = await $.ui.mount(BAND)
+  await paste($, 'y'.repeat(1500))
+  await clock.advance(33)
+  expect((await ui.find({ key: 'sparks' }))?.props.rows).toBe(7)
+
+  await clock.advance(2000)
   expect((await ui.find({ key: 'sparks' }))?.props.rows).toBe(4)
   await ui.unmount()
 })
 
-test('a collapsed paste placeholder is a nuke too', async ($, on) => {
+test('a collapsed paste placeholder is a big blast too', async ($, on) => {
   const clock = engine(on)
   on('prompt.change', () => ({}))
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
 
   const ui = await $.ui.mount(BAND)
-  await $.prompt.edit({
-    origin: { kind: 'composer' },
-    text: '',
-    cursor: 0,
-    start: 0,
-    end: 0,
-    inputText: '[Pasted text #1 +19 lines]',
-  } as never)
+  await paste($, '[Pasted text #1 +19 lines]')
   await clock.advance(33)
-  expect((await ui.find({ key: 'sparks' }))?.props.rows).toBe(11)
+  expect((await ui.find({ key: 'sparks' }))?.props.rows).toBe(7)
   await ui.unmount()
 })
 
@@ -178,7 +183,7 @@ test('Claude celebrates a big win with its shout in the sky', async ($, on) => {
   await ui.unmount()
 })
 
-test('level 5 is the nuke', async ($, on) => {
+test('level 5 is the nuke, the only one', async ($, on) => {
   const clock = engine(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
 

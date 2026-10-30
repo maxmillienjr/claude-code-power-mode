@@ -229,13 +229,18 @@ await scene('godlike', 4, async snap => {
   await tail(s, snap, 20)
 }, 26)
 
-await scene('nuke', 11, async snap => {
+// A paste of 100+ characters is a blast in the usual band; 1,000+ (or a
+// collapsed paste) a big one that grows the band.
+await scene('paste', 7, async snap => {
   const s = session()
   await s.start()
-  await typeOut(s, snap, 'explain this stack trace: ')
+  await typeOut(s, snap, 'why does this fail: ')
+  await s.paste('x'.repeat(300), 'x'.repeat(30))
+  await tail(s, snap, 40)
+  s.draft = 'and here is the whole log: '
   await s.paste('x'.repeat(1800), '[Pasted text #1 +42 lines]')
-  await tail(s, snap, 100)
-}, 78)
+  await tail(s, snap, 55)
+}, 48)
 
 // Claude's celebrations, one per level, after a reply that earned it.
 const CELEBRATIONS = [

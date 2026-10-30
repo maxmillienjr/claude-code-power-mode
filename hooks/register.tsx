@@ -3,7 +3,7 @@ import type { Register } from 'claude-code'
 
 const isActive = atom({ plugin: 'power-mode', key: 'isActive' } as const, false)
 const isEnabled = atom({ plugin: 'power-mode', key: 'isEnabled' } as const, true)
-// The band grows for a nuke and for the bigger celebrations.
+// The band grows for a big paste and for the bigger celebrations.
 const isTall = atom({ plugin: 'power-mode', key: 'isTall' } as const, false)
 
 const TICK_MS = 33
@@ -16,8 +16,12 @@ const MILESTONE = 25
 const EXCLAIM_MS = 1600
 const SHAKE_MS = 110
 const GRAVITY = 70 // braille dots per second squared
-const NUKE_PASTE = 100 // a paste this many characters long is a nuke
-const NUKE_MS = 2800
+const BLAST_PASTE = 100 // a paste this many characters long is a blast
+const BIG_PASTE = 1000 // and this many, or a collapsed paste, a big one
+const BLAST_MS = 900
+const BIG_BLAST_MS = 1300
+const BIG_BLAST_ROWS = 6
+const NUKE_MS = 2800 // the nuke is Claude's alone, level 5
 const NUKE_ROWS = 10 // the band grows to this many spark rows for a nuke, room allowing
 const CELEBRATE = 'celebrate'
 const VOLLEY_MS = 350 // between rocket volleys at level 4
@@ -30,7 +34,8 @@ const EXCLAMATIONS = [
   'Super!', 'Radical!', 'Fantastic!', 'Great!', 'OMG!', 'Whoah!', 'Nice!',
   'Splendid!', 'Wild!', 'Grand!', 'Impressive!', 'Stupendous!', 'Extreme!', 'Awesome!',
 ]
-const NUKE_WORDS = ['KABOOM!', 'NUCLEAR!', 'MELTDOWN!', 'OBLITERATED!', 'TOTAL ANNIHILATION!']
+const BLAST_WORDS = ['BLAM!', 'KAPOW!', 'WHAM!', 'KRAK!', 'BOOM!']
+const BIG_BLAST_WORDS = ['KABOOM!', 'KA-BLAM!', 'MEGA PASTE!', 'BIG ONE!']
 
 // Each tier changes how the sparks behave, not only their number.
 type Tier = { at: number; name: string; sparks: number; speed: number; flames: number; fireworks: boolean }
@@ -65,6 +70,7 @@ type Geometry = { requestId: string; columns: number; rows: number }
 // `ms` is how long it shows; a big celebration holds its shout for the whole show.
 type Exclamation = { text: string; age: number; color: number; ms: number }
 type Nuke = { age: number; column: number }
+type Blast = { age: number; column: number; isBig: boolean }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.floor(n)))
 const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length)] as T
@@ -118,6 +124,7 @@ export const register: Register = (on, options) => {
   let particles: Particle[] = []
   let exclamation: Exclamation | undefined
   let nuke: Nuke | undefined
+  let blast: Blast | undefined
   let combo = 0
   let best = 0
   let t = 0
@@ -176,6 +183,25 @@ export const register: Register = (on, options) => {
         color: pick(colorsNow()),
         fuse: fireworks && Math.random() < 0.15 ? 250 + Math.random() * 200 : 0,
         star,
+      })
+    }
+    if (particles.length > 600) particles = particles.slice(-600)
+  }
+
+  // Debris thrown low and wide to both sides of a blast.
+  function debris(column: number, count: number, isBig: boolean) {
+    for (let i = 0; i < count; i++) {
+      const side = i % 2 === 0 ? 1 : -1
+      particles.push({
+        x: column * 2 + 1,
+        h: 0.5,
+        vx: side * (30 + Math.random() * (isBig ? 90 : 60)),
+        vh: 12 + Math.random() * (isBig ? 34 : 22),
+        age: 0,
+        life: 500 + Math.random() * 500,
+        color: pick(colorsNow()),
+        fuse: 0,
+        star: isBig,
       })
     }
     if (particles.length > 600) particles = particles.slice(-600)
@@ -242,6 +268,44 @@ export const register: Register = (on, options) => {
     }
   }
 
+  // A paste: a fireball on the ground at the paste, then a shockwave both ways.
+  function drawBlast(b: Blast, columns: number, spark: number, glyph: Uint32Array, fg: Uint32Array) {
+    const ms = b.isBig ? BIG_BLAST_MS : BLAST_MS
+    const k = b.age / ms
+    const cell = (y: number, c: number) => (spark - 1 - y) * columns + c
+    const swell = 1 - Math.pow(1 - Math.min(1, b.age / 220), 2)
+    const ry = (b.isBig ? 3.2 : 1.8) * swell
+    const rx = ry * 2.4
+    const fade = b.age < 180 ? 1 : Math.max(0, 1 - (b.age - 180) / (ms * 0.45))
+    const boil = Math.floor(b.age / 70)
+
+    if (fade > 0) {
+      for (let y = 0; y < Math.min(spark, Math.ceil(ry)); y++) {
+        for (let c = Math.max(0, Math.floor(b.column - rx)); c <= Math.min(columns - 1, b.column + rx); c++) {
+          const inBall = ((c - b.column) / rx) ** 2 + (y / ry) ** 2
+          if (inBall > 1) continue
+          const d = (1 - inBall + (hash(c * 5.3 + y * 11.1 + boil) - 0.5) * 0.4) * fade
+          if (d < 0.12) continue
+          glyph[cell(y, c)] = b.age < 70 ? 0x2588 : (SHADES[d > 0.7 ? 3 : d > 0.45 ? 2 : d > 0.25 ? 1 : 0] ?? SPACE)
+          fg[cell(y, c)] = b.age < 70 ? 0xffffff : d > 0.7 ? 0xfff2b0 : d > 0.45 ? 0xffb000 : d > 0.25 ? 0xff5a00 : 0xb03020
+        }
+      }
+    }
+
+    // The shockwave runs out along the ground both ways.
+    const radius = rx + (b.age / 1000) * (b.isBig ? 80 : 55)
+    if (k < 0.8) {
+      for (const c of [b.column - radius, b.column + radius]) {
+        for (let w = 0; w < 2; w++) {
+          const at = Math.round(c) + (c < b.column ? w : -w)
+          if (at < 0 || at >= columns) continue
+          glyph[cell(0, at)] = SHADES[1 - w] ?? SPACE
+          fg[cell(0, at)] = scale(0xff9a3a, Math.max(0.3, 1 - k / 0.8))
+        }
+      }
+    }
+  }
+
   function frame(): string {
     const columns = geometry?.columns ?? 1
     const rows = geometry?.rows ?? sparkRows + 1
@@ -266,6 +330,7 @@ export const register: Register = (on, options) => {
     }
 
     if (nuke !== undefined) drawNuke(nuke, columns, spark, glyph, fg)
+    if (blast !== undefined) drawBlast(blast, columns, spark, glyph, fg)
 
     for (const p of particles) {
       const dx = Math.floor(p.x)
@@ -370,6 +435,11 @@ export const register: Register = (on, options) => {
       if (nuke.age > NUKE_MS) nuke = undefined
     }
 
+    if (blast !== undefined) {
+      blast.age += TICK_MS
+      if (blast.age > (blast.isBig ? BIG_BLAST_MS : BLAST_MS)) blast = undefined
+    }
+
     let shrink = false
     if (tall && nuke === undefined && volleys.length === 0 && t >= tallUntil) {
       tall = false
@@ -387,7 +457,13 @@ export const register: Register = (on, options) => {
     return {
       expired,
       shrink,
-      idle: combo === 0 && particles.length === 0 && exclamation === undefined && nuke === undefined && volleys.length === 0,
+      idle:
+        combo === 0 &&
+        particles.length === 0 &&
+        exclamation === undefined &&
+        nuke === undefined &&
+        blast === undefined &&
+        volleys.length === 0,
     }
   }
 
@@ -453,8 +529,9 @@ export const register: Register = (on, options) => {
     return level >= 2
   }
 
-  // A hit of `chars` characters at `column`. Returns whether it set off a nuke.
-  function hit(column: number, chars: number, isPaste: boolean): boolean {
+  // A hit of `chars` characters at `column`. Returns whether the band grows,
+  // as it does for a big paste (`isBig`: 1,000 characters or a collapsed one).
+  function hit(column: number, chars: number, isPaste: boolean, isBig = false): boolean {
     const before = combo
     combo += isPaste ? chars : 1
     lastHitAt = t
@@ -463,12 +540,13 @@ export const register: Register = (on, options) => {
     const spec = TIERS[tier] ?? TIERS[0]!
     const width = geometry?.columns ?? 80
 
-    if (isPaste && chars >= NUKE_PASTE) {
-      nuke = { age: 0, column: clamp(column, 8, Math.max(8, width - 9)) }
-      grow(NUKE_ROWS, NUKE_MS)
-      burst(nuke.column, 120, 30, 1.8, true)
-      exclaim(pick(NUKE_WORDS))
-      return true
+    if (isPaste && (isBig || chars >= BLAST_PASTE)) {
+      const big = isBig || chars >= BIG_PASTE
+      blast = { age: 0, column: clamp(column, 4, Math.max(4, width - 5)), isBig: big }
+      debris(blast.column, big ? 70 : 36, big)
+      exclaim(pick(big ? BIG_BLAST_WORDS : BLAST_WORDS))
+      if (big) grow(BIG_BLAST_ROWS, BIG_BLAST_MS + 300)
+      return big
     }
 
     if (isPaste) burst(column, 40, 16, 1.4, spec.fireworks)
@@ -524,6 +602,7 @@ export const register: Register = (on, options) => {
       particles = []
       exclamation = undefined
       nuke = undefined
+      blast = undefined
       volleys = []
       tall = false
       endCombo()
@@ -544,9 +623,10 @@ export const register: Register = (on, options) => {
       const width = geometry?.columns ?? 80
       const isPaste = e.key === undefined && e.inputText.length > 1
       const column = isPaste ? (PROMPT_INDENT + e.start - lineStart) % width : (PROMPT_INDENT + caret - lineStart) % width
-      const chars = newPastes(e.inputText) > 0 ? Math.max(NUKE_PASTE, e.inputText.length) : Math.max(1, e.inputText.length)
+      const isCollapsed = newPastes(e.inputText) > 0
+      const chars = isCollapsed ? Math.max(BLAST_PASTE, e.inputText.length) : Math.max(1, e.inputText.length)
 
-      const isNuke = hit(column, chars, isPaste)
+      const isGrown = hit(column, chars, isPaste, isCollapsed)
       if (timer === undefined) {
         timer = $.clock.every(TICK_MS, () => {
           const r = tick()
@@ -561,7 +641,7 @@ export const register: Register = (on, options) => {
           }
         })
       }
-      if (isNuke) await update($, isTall, () => true)
+      if (isGrown) await update($, isTall, () => true)
       await update($, isActive, () => true)
     }
 
@@ -573,7 +653,7 @@ export const register: Register = (on, options) => {
     if (newPastes(e.text) > 0 && (await read($, isEnabled))) {
       const width = geometry?.columns ?? 80
       const lineStart = e.text.lastIndexOf('\n', e.cursor - 1) + 1
-      hit((PROMPT_INDENT + e.cursor - lineStart) % width, NUKE_PASTE, true)
+      hit((PROMPT_INDENT + e.cursor - lineStart) % width, BLAST_PASTE, true, true)
       if (timer === undefined) {
         timer = $.clock.every(TICK_MS, () => {
           const r = tick()

@@ -1,12 +1,12 @@
 # Power Mode for Claude Code
 
 Sparks fly off the caret as you type into the Claude Code prompt. Keep typing and
-the combo builds, the effects grow with it, and pasting something big sets off a mushroom
-cloud. It is a Claude Code mod in the spirit of the editor classics:
+the combo builds, the effects grow with it, and a paste goes off like a bomb. When
+Claude lands something big, it can set off fireworks or, once a project, a mushroom cloud. It is a Claude Code mod in the spirit of the editor classics:
 [activate-power-mode](https://github.com/JoelBesada/activate-power-mode) for Atom and
 [vscode-power-mode](https://github.com/hoovercj/vscode-power-mode).
 
-![Pasting a stack trace sets off a mushroom cloud above the prompt](docs/demo/nuke.gif)
+![Claude sets off the mushroom cloud for a once-a-project win](docs/demo/celebrate-5.gif)
 
 ## Install
 
@@ -54,11 +54,14 @@ The combo climbs through tiers, and each tier changes how the sparks behave:
 Crossing a tier shouts its name and sends a burst across the full width. Every 25 hits
 in between earns an exclamation ("Radical!", "Stupendous!").
 
-**Pastes.** A paste of 100 characters or more (or one Claude Code collapses into
-`[Pasted text #1 +19 lines]`) is a nuke: the band grows, a white flash fills it, a
-mushroom cloud rises from where you pasted with a shockwave running along the ground,
-and it cools from yellow through red to smoke before the band shrinks back. A paste
-adds its length to the combo.
+**Pastes.** A paste of 100 characters or more is a blast: a white flash where you
+pasted, a fireball that cools from yellow to red, debris thrown out to both sides and a
+shockwave running along the ground, all in the usual rows. A paste of 1,000 or more (or
+one Claude Code collapses into `[Pasted text #1 +19 lines]`) is a big one: the band
+grows to fit it and the debris flies as stars. A paste adds its length to the combo.
+The mushroom cloud is not for pastes; only Claude can set that off.
+
+![A paste goes off in the usual rows, then a big one grows the band](docs/demo/paste.gif)
 
 Submitting a prompt mid-combo fires one last burst across the width.
 
