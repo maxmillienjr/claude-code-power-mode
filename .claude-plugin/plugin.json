@@ -1,7 +1,7 @@
 {
   "name": "power-mode",
   "version": "0.1.0",
-  "description": "Power Mode for the Claude Code prompt: sparks fly off the caret as you type, a combo counter builds, exclamations at milestones.",
+  "description": "Power Mode for the Claude Code prompt: sparks fly off the caret as you type, the combo builds through tiers, pastes go off with a blast, and Claude celebrates real wins, up to a mushroom cloud.",
   "author": {
     "name": "Max Millien",
     "url": "https://github.com/maxmillienjr"
