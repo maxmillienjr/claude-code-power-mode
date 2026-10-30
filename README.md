@@ -1,12 +1,13 @@
 # Power Mode for Claude Code
 
 Sparks fly off the caret as you type into the Claude Code prompt. Keep typing and
-the combo builds, the effects grow with it, and a paste goes off like a bomb. When
-Claude lands something big, it can set off fireworks or, once a project, a mushroom cloud. It is a Claude Code mod in the spirit of the editor classics:
+the combo builds, the effects grow with it, and a paste goes off with a blast. When
+Claude lands something big, it sets off fireworks. It is a Claude Code mod in the
+spirit of the editor classics:
 [activate-power-mode](https://github.com/JoelBesada/activate-power-mode) for Atom and
 [vscode-power-mode](https://github.com/hoovercj/vscode-power-mode).
 
-![Claude sets off the mushroom cloud for a once-a-project win](docs/demo/celebrate-5.gif)
+![GODLIKE: flames, rainbow sparks and the timer bar above the prompt](docs/demo/godlike.gif)
 
 ## Install
 
@@ -48,7 +49,6 @@ The combo climbs through tiers, and each tier changes how the sparks behave:
 
 ![ON FIRE: flames along the bottom row](docs/demo/on-fire.gif)
 ![UNSTOPPABLE: sparks burst into fireworks](docs/demo/unstoppable.gif)
-![GODLIKE: rainbow sparks](docs/demo/godlike.gif)
 
 Crossing a tier shouts its name on the right and sends a burst across the full width. Every 25 hits
 in between earns an exclamation ("Radical!", "Stupendous!").
